@@ -21,7 +21,6 @@ typedef struct {
 
 @interface PrivacyScreenPlugin : CDVPlugin
 
-- (void) setTimer:(CDVInvokedUrlCommand*)command;
 - (void) hidePrivacyScreen:(CDVInvokedUrlCommand*)command;
 - (void) showPrivacyScreen:(CDVInvokedUrlCommand*)command;
 

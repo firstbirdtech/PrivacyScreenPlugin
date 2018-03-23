@@ -6,14 +6,9 @@
  */
 #import "PrivacyScreenPlugin.h"
 
-#define PRIVACY_TIMER_DEFAULT   3.0f;
-
 static UIImageView *imageView;
 
 @interface PrivacyScreenPlugin ()
-
-@property (strong, nonatomic) NSTimer* privacyTimer;
-@property (nonatomic) float privacyTimerInterval;
 @end
 
 
@@ -22,21 +17,14 @@ static UIImageView *imageView;
 #pragma mark - Initialize
 - (void)pluginInitialize
 {
-    NSString* privacyTimerKey = @"privacytimer";
-    NSString* prefTimer = [self.commandDelegate.settings objectForKey:[privacyTimerKey lowercaseString]];
-    //Default value
-    self.privacyTimerInterval = PRIVACY_TIMER_DEFAULT;
-    if(prefTimer)
-        self.privacyTimerInterval = [prefTimer floatValue] > 0.0f ? [prefTimer floatValue] : PRIVACY_TIMER_DEFAULT;
-    
-    
+
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onAppDidBecomeActive:)
                                                  name:UIApplicationDidBecomeActiveNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onPageDidLoad)
                                                  name:CDVPageDidLoadNotification object:nil];
-    
+
     NSString* onBackgroundKey = @"privacyonbackground";
-    
+
     if([self.commandDelegate.settings objectForKey:[onBackgroundKey lowercaseString]] && [[self.commandDelegate.settings objectForKey:[onBackgroundKey lowercaseString]] isEqualToString:@"true"])
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onAppWillResignActive:)
                                                      name:UIApplicationDidEnterBackgroundNotification object:nil];
@@ -46,31 +34,9 @@ static UIImageView *imageView;
 }
 
 #pragma mark - Explicit Commands
-- (void) setTimer:(CDVInvokedUrlCommand*)command
-{
-    if(command.arguments.count > 0)
-    {
-        if(!command.arguments[0] || command.arguments[0] == [NSNull null])
-        {
-            CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"Timer argument is null"];
-            [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-            return;
-        }
-        //timeInterval argument
-        self.privacyTimerInterval = [command.arguments[0] floatValue];
-        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-    }
-    else
-    {
-        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"No arguments provided"];
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-    }
-}
-
 - (void) hidePrivacyScreen:(CDVInvokedUrlCommand*)command
 {
-     [self removePrivacyScreen];
+    [self removePrivacyScreen];
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
@@ -78,12 +44,6 @@ static UIImageView *imageView;
 - (void) showPrivacyScreen:(CDVInvokedUrlCommand*)command
 {
     [self applyPrivacyScreen];
-    [self.privacyTimer invalidate];
-    self.privacyTimer = [NSTimer scheduledTimerWithTimeInterval:self.privacyTimerInterval
-                                                         target:self
-                                                       selector:@selector(removePrivacyScreen)
-                                                       userInfo:nil
-                                                        repeats:NO];
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
@@ -96,13 +56,7 @@ static UIImageView *imageView;
 
 - (void)onAppDidBecomeActive:(UIApplication *)application
 {
-    [self.privacyTimer invalidate];
-    //if(!self.privacyTimer || !self.privacyTimer.valid)
-    self.privacyTimer = [NSTimer scheduledTimerWithTimeInterval:self.privacyTimerInterval
-                                                         target:self
-                                                       selector:@selector(removePrivacyScreen)
-                                                       userInfo:nil
-                                                        repeats:NO];
+    [self removePrivacyScreen];
 }
 
 - (void)onAppWillResignActive:(UIApplication *)application
@@ -113,11 +67,10 @@ static UIImageView *imageView;
 #pragma mark - Helper functions
 -(void) removePrivacyScreen
 {
-    if(imageView)
+    if (imageView)
     {
         self.viewController.view.window.hidden = NO;
-        
-        
+
         [UIView animateWithDuration:0.1f
                          animations:^{
                              imageView.alpha = 0.0f;
@@ -125,45 +78,37 @@ static UIImageView *imageView;
                          completion:^(BOOL finished) {
                              [imageView removeFromSuperview];
                          }];
-        
     }
-    
-//    if(self.privacyTimer || self.privacyTimer.valid)
-//    {
-    [self.privacyTimer invalidate];
-    self.privacyTimer = nil;
-//    }
 }
 
 -(void) applyPrivacyScreen
 {
-    CDVViewController *vc = (CDVViewController*)self.viewController;
-    NSString *imgName = [self getImageName:(id<CDVScreenOrientationDelegate>)vc device:[self getCurrentDevice]];
     UIImage* splash;
 
-    splash = [self getImageFromName:imgName];
-    
+    // splash = [UIImage imageNamed:@"LaunchStoryboard"];
+
+    NSString* imageName = [self getImageName:[self getCurrentOrientation] delegate:(id<CDVScreenOrientationDelegate>)self.viewController device:[self getCurrentDevice]];
+    splash = [UIImage imageNamed:imageName];
+
     if (splash == NULL)
     {
         self.viewController.view.window.hidden = YES;
     }
     else
     {
-
         [imageView removeFromSuperview];
         imageView = nil;
-            
+
         imageView = [[UIImageView alloc]initWithFrame:[self.viewController.view bounds]];
         [imageView setImage:splash];
-        
-#ifdef __CORDOVA_4_0_0
-        [[UIApplication sharedApplication].keyWindow addSubview:imageView];
-#else
-        [self.viewController.view addSubview:imageView];
-#endif
-        
-    }
 
+      #ifdef __CORDOVA_4_0_0
+        [[UIApplication sharedApplication].keyWindow addSubview:imageView];
+      #else
+        [self.viewController.view addSubview:imageView];
+      #endif
+
+    }
 }
 
 // Code below borrowed from the CDV splashscreen plugin @ https://github.com/apache/cordova-plugin-splashscreen
@@ -171,13 +116,13 @@ static UIImageView *imageView;
 - (CDV_iOSDevice) getCurrentDevice
 {
     CDV_iOSDevice device;
-    
+
     UIScreen* mainScreen = [UIScreen mainScreen];
     CGFloat mainScreenHeight = mainScreen.bounds.size.height;
     CGFloat mainScreenWidth = mainScreen.bounds.size.width;
-    
+
     int limit = MAX(mainScreenHeight,mainScreenWidth);
-    
+
     device.iPad = (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad);
     device.iPhone = (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPhone);
     device.retina = ([mainScreen scale] == 2.0);
@@ -188,21 +133,174 @@ static UIImageView *imageView;
     // this is appropriate for detecting the runtime screen environment
     device.iPhone6 = (device.iPhone && limit == 667.0);
     device.iPhone6Plus = (device.iPhone && limit == 736.0);
-    device.iPhoneX = (device.iPhone && limit == 812.0);
-    
+    device.iPhoneX  = (device.iPhone && limit == 812.0);
+
     return device;
+}
+
+- (BOOL) isUsingCDVLaunchScreen {
+    NSString* launchStoryboardName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"UILaunchStoryboardName"];
+    if (launchStoryboardName) {
+        return ([launchStoryboardName isEqualToString:@"CDVLaunchScreen"]);
+    } else {
+        return NO;
+    }
+}
+
+- (UIInterfaceOrientation)getCurrentOrientation
+{
+    UIInterfaceOrientation iOrientation = [UIApplication sharedApplication].statusBarOrientation;
+    UIDeviceOrientation dOrientation = [UIDevice currentDevice].orientation;
+
+    bool landscape;
+
+    if (dOrientation == UIDeviceOrientationUnknown || dOrientation == UIDeviceOrientationFaceUp || dOrientation == UIDeviceOrientationFaceDown) {
+        // If the device is laying down, use the UIInterfaceOrientation based on the status bar.
+        landscape = UIInterfaceOrientationIsLandscape(iOrientation);
+    } else {
+        // If the device is not laying down, use UIDeviceOrientation.
+        landscape = UIDeviceOrientationIsLandscape(dOrientation);
+
+        // There's a bug in iOS!!!! http://openradar.appspot.com/7216046
+        // So values needs to be reversed for landscape!
+        if (dOrientation == UIDeviceOrientationLandscapeLeft)
+        {
+            iOrientation = UIInterfaceOrientationLandscapeRight;
+        }
+        else if (dOrientation == UIDeviceOrientationLandscapeRight)
+        {
+            iOrientation = UIInterfaceOrientationLandscapeLeft;
+        }
+        else if (dOrientation == UIDeviceOrientationPortrait)
+        {
+            iOrientation = UIInterfaceOrientationPortrait;
+        }
+        else if (dOrientation == UIDeviceOrientationPortraitUpsideDown)
+        {
+            iOrientation = UIInterfaceOrientationPortraitUpsideDown;
+        }
+    }
+
+    return iOrientation;
+}
+
+- (NSString*)getImageName:(UIInterfaceOrientation)currentOrientation delegate:(id<CDVScreenOrientationDelegate>)orientationDelegate device:(CDV_iOSDevice)device
+{
+    // Use UILaunchImageFile if specified in plist.  Otherwise, use Default.
+    NSString* imageName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"UILaunchImageFile"];
+
+    // detect if we are using CB-9762 Launch Storyboard; if so, return the associated image instead
+    if ([self isUsingCDVLaunchScreen]) {
+        imageName = @"LaunchStoryboard";
+        return imageName;
+    }
+
+    NSUInteger supportedOrientations = [orientationDelegate supportedInterfaceOrientations];
+
+    // Checks to see if the developer has locked the orientation to use only one of Portrait or Landscape
+    BOOL supportsLandscape = (supportedOrientations & UIInterfaceOrientationMaskLandscape);
+    BOOL supportsPortrait = (supportedOrientations & UIInterfaceOrientationMaskPortrait || supportedOrientations & UIInterfaceOrientationMaskPortraitUpsideDown);
+    // this means there are no mixed orientations in there
+    BOOL isOrientationLocked = !(supportsPortrait && supportsLandscape);
+
+    if (imageName)
+    {
+        imageName = [imageName stringByDeletingPathExtension];
+    }
+    else
+    {
+        imageName = @"Default";
+    }
+
+    // Add Asset Catalog specific prefixes
+    if ([imageName isEqualToString:@"LaunchImage"])
+    {
+        if (device.iPhone4 || device.iPhone5 || device.iPad) {
+            imageName = [imageName stringByAppendingString:@"-700"];
+        } else if(device.iPhone6) {
+            imageName = [imageName stringByAppendingString:@"-800"];
+        } else if(device.iPhone6Plus || device.iPhoneX ) {
+            if(device.iPhone6Plus) {
+                imageName = [imageName stringByAppendingString:@"-800"];
+            } else {
+                imageName = [imageName stringByAppendingString:@"-1100"];
+            }
+            if (currentOrientation == UIInterfaceOrientationPortrait || currentOrientation == UIInterfaceOrientationPortraitUpsideDown)
+            {
+                imageName = [imageName stringByAppendingString:@"-Portrait"];
+            }
+        }
+    }
+
+    if (device.iPhone5)
+    { // does not support landscape
+        imageName = [imageName stringByAppendingString:@"-568h"];
+    }
+    else if (device.iPhone6)
+    { // does not support landscape
+        imageName = [imageName stringByAppendingString:@"-667h"];
+    }
+    else if (device.iPhone6Plus || device.iPhoneX)
+    { // supports landscape
+        if (isOrientationLocked)
+        {
+            imageName = [imageName stringByAppendingString:(supportsLandscape ? @"-Landscape" : @"")];
+        }
+        else
+        {
+            switch (currentOrientation)
+            {
+                case UIInterfaceOrientationLandscapeLeft:
+                case UIInterfaceOrientationLandscapeRight:
+                    imageName = [imageName stringByAppendingString:@"-Landscape"];
+                    break;
+                default:
+                    break;
+            }
+        }
+        if (device.iPhoneX) {
+            imageName = [imageName stringByAppendingString:@"-2436h"];
+        } else {
+            imageName = [imageName stringByAppendingString:@"-736h"];
+        }
+    }
+    else if (device.iPad)
+    {   // supports landscape
+        if (isOrientationLocked)
+        {
+            imageName = [imageName stringByAppendingString:(supportsLandscape ? @"-Landscape" : @"-Portrait")];
+        }
+        else
+        {
+            switch (currentOrientation)
+            {
+                case UIInterfaceOrientationLandscapeLeft:
+                case UIInterfaceOrientationLandscapeRight:
+                    imageName = [imageName stringByAppendingString:@"-Landscape"];
+                    break;
+
+                case UIInterfaceOrientationPortrait:
+                case UIInterfaceOrientationPortraitUpsideDown:
+                default:
+                    imageName = [imageName stringByAppendingString:@"-Portrait"];
+                    break;
+            }
+        }
+    }
+
+    return imageName;
 }
 
 - (void)updateBounds
 {
-    
+
     UIImage* img = imageView.image;
     CGRect imgBounds = (img) ? CGRectMake(0, 0, img.size.width, img.size.height) : CGRectZero;
-    
+
     CGSize screenSize = [self.viewController.view convertRect:[UIScreen mainScreen].bounds fromView:nil].size;
     UIInterfaceOrientation orientation = [UIApplication sharedApplication].statusBarOrientation;
     CGAffineTransform imgTransform = CGAffineTransformIdentity;
-    
+
     /* If and only if an iPhone application is landscape-only as per
      * UISupportedInterfaceOrientations, the view controller's orientation is
      * landscape. In this case the image must be rotated in order to appear
@@ -214,7 +312,7 @@ static UIImageView *imageView;
         imgTransform = CGAffineTransformMakeRotation(M_PI / 2);
         imgBounds.size = CGSizeMake(imgBounds.size.height, imgBounds.size.width);
     }
-    
+
     // There's a special case when the image is the size of the screen.
     if (CGSizeEqualToSize(screenSize, imgBounds.size))
     {
@@ -242,134 +340,9 @@ static UIImageView *imageView;
         imgBounds.size.height *= ratio;
         imgBounds.size.width *= ratio;
     }
-    
+
     imageView.transform = imgTransform;
     imageView.frame = imgBounds;
-}
-
-
-
-
-- (NSString*)getImageName:(id<CDVScreenOrientationDelegate>)orientationDelegate device:(CDV_iOSDevice)device
-{
-    
-    NSString* imageName;
-    
-    NSString* privacyImageNameKey = @"privacyimagename";
-    NSString* prefImageName = [self.commandDelegate.settings objectForKey:[privacyImageNameKey lowercaseString]];
-    imageName = prefImageName ? prefImageName : @"Default";
-    //Override Launch images?
-    NSString* privacyOverrideLaunchImage = @"privacyoverridelaunchimage";
-    if([self.commandDelegate.settings objectForKey:[privacyOverrideLaunchImage lowercaseString]] && [[self.commandDelegate.settings objectForKey:[privacyOverrideLaunchImage lowercaseString]] isEqualToString:@"true"])
-    {
-        
-    }
-    else
-    {
-        // Use UILaunchImageFile if specified in plist.  Otherwise, use Default.
-        imageName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"UILaunchImageFile"];
-        imageName = [imageName stringByDeletingPathExtension];
-    }
-    
-    NSUInteger supportedOrientations = [orientationDelegate supportedInterfaceOrientations];
-    
-    // Checks to see if the developer has locked the orientation to use only one of Portrait or Landscape
-    BOOL supportsLandscape = (supportedOrientations & UIInterfaceOrientationMaskLandscape);
-    BOOL supportsPortrait = (supportedOrientations & UIInterfaceOrientationMaskPortrait || supportedOrientations & UIInterfaceOrientationMaskPortraitUpsideDown);
-    // this means there are no mixed orientations in there
-    BOOL isOrientationLocked = !(supportsPortrait && supportsLandscape);
-    
-    UIDeviceOrientation deviceOrientation = [UIDevice currentDevice].orientation;
-    // Add Asset Catalog specific prefixes
-    if ([imageName isEqualToString:@"LaunchImage"])
-    {
-        if(device.iPhone4 || device.iPhone5 || device.iPad) {
-            imageName = [imageName stringByAppendingString:@"-700"];
-        } else if(device.iPhone6) {
-            imageName = [imageName stringByAppendingString:@"-800"];
-        } else if(device.iPhone6Plus) {
-            imageName = [imageName stringByAppendingString:@"-800"];
-            if (deviceOrientation == UIDeviceOrientationPortrait || deviceOrientation == UIDeviceOrientationPortraitUpsideDown) {
-                imageName = [imageName stringByAppendingString:@"-Portrait"];
-            }
-        }
-    }
-    
-    BOOL isLandscape = supportsLandscape &&
-    (deviceOrientation == UIDeviceOrientationLandscapeLeft || deviceOrientation == UIDeviceOrientationLandscapeRight);
-    
-    if (device.iPhone4) { // does not support landscape
-        imageName = isLandscape ? nil : [imageName stringByAppendingString:@"480h"];
-    } else if (device.iPhone5) { // does not support landscape
-        imageName = isLandscape ? nil : [imageName stringByAppendingString:@"568h"];
-    } else if (device.iPhone6) { // does not support landscape
-        imageName = isLandscape ? nil : [imageName stringByAppendingString:@"667h"];
-    } else if (device.iPhoneX) { // does not support landscape
-        imageName = isLandscape ? nil : [imageName stringByAppendingString:@"812h"];
-    } else if (device.iPhone6Plus) { // supports landscape
-        if (isOrientationLocked) {
-            imageName = [imageName stringByAppendingString:(supportsLandscape ? @"Landscape" : @"")];
-        } else {
-            switch (deviceOrientation) {
-                case UIInterfaceOrientationLandscapeLeft:
-                case UIInterfaceOrientationLandscapeRight:
-                    imageName = [imageName stringByAppendingString:@"Landscape"];
-                    break;
-                default:
-                    break;
-            }
-        }
-        imageName = [imageName stringByAppendingString:@"736h"];
-        
-    } else if (device.iPad) { // supports landscape
-        if (isOrientationLocked) {
-            imageName = [imageName stringByAppendingString:(supportsLandscape ? @"Landscape" : @"Portrait")];
-        } else {
-            switch (deviceOrientation) {
-                case UIInterfaceOrientationLandscapeLeft:
-                case UIInterfaceOrientationLandscapeRight:
-                    imageName = [imageName stringByAppendingString:@"Landscape"];
-                    break;
-                    
-                case UIInterfaceOrientationPortrait:
-                case UIInterfaceOrientationPortraitUpsideDown:
-                default:
-                    imageName = [imageName stringByAppendingString:@"Portrait"];
-                    break;
-            }
-        }
-    }
-//    if(imageName)
-//    {
-//        imageName = [imageName stringByAppendingString:@".png"];
-//    }
-    return imageName;
-}
-
-- (UIImage*) getImageFromName:(NSString*) imageName
-{
-    UIImage *image = [UIImage imageNamed:imageName];
-    if (image == NULL)
-    {
-        //If not in bundle try to go to resources path
-        NSString* imagePath = [imageName stringByAppendingString:@".png"];
-        image = [UIImage imageWithContentsOfFile:[[[NSBundle mainBundle] resourcePath] stringByAppendingString:imagePath]];
-        if(image)
-            return image;
-        
-        //try to take out hyfens and see if that works (Compatbility with Outsystems mobile issue)
-        imageName = [imageName stringByReplacingOccurrencesOfString:@"-" withString:@""];
-        image = [UIImage imageNamed:imageName];
-        if(image == NULL)
-        {
-            imagePath = [imageName stringByAppendingString:@".png"];
-            image = [UIImage imageWithContentsOfFile:[[[NSBundle mainBundle] resourcePath] stringByAppendingString:imagePath]];
-            //If still null image doesn't really exist.
-        }
-    }
-    
-    
-    return image;
 }
 
 @end

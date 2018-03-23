@@ -1,9 +1,9 @@
 {
-  "name": "cordova-plugin-privacyscreen",
+  "name": "cordova-plugin-fb-privacyscreen",
   "version": "0.4.3",
   "description": "Secures your app from displaying a screenshot in task switchers under Android and iOS. Keeps sensitive information private.",
   "cordova": {
-    "id": "cordova-plugin-privacyscreen",
+    "id": "cordova-plugin-fb-privacyscreen",
     "platforms": [
       "android",
       "ios"
@@ -11,7 +11,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/devgeeks/PrivacyScreenPlugin.git"
+    "url": "git+https://github.com/firstbirdtech/PrivacyScreenPlugin.git"
   },
   "keywords": [
     "privacy",
@@ -20,10 +20,10 @@
     "cordova-android",
     "cordova-ios"
   ],
-  "author": "Tommy-Carlos Willaims <tommy@devgeeks.org>",
+  "author": "Firstbird",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/devgeeks/PrivacyScreenPlugin/issues"
+    "url": "https://github.com/firstbirdtech/PrivacyScreenPlugin/issues"
   },
-  "homepage": "https://github.com/devgeeks/PrivacyScreenPlugin#readme"
+  "homepage": "https://github.com/firstbirdtech/PrivacyScreenPlugin#readme"
 }
