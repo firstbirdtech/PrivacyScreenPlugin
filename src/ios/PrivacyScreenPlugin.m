@@ -1,16 +1,10 @@
-/**
- * PrivacyScreenPlugin.m
- * Created by Tommy-Carlos Williams on 18/07/2014
- * Copyright (c) 2014 Tommy-Carlos Williams. All rights reserved.
- * MIT Licensed
- */
 #import "PrivacyScreenPlugin.h"
 
 static UIImageView *imageView;
+UIViewController *blankViewController;
 
 @interface PrivacyScreenPlugin ()
 @end
-
 
 @implementation PrivacyScreenPlugin
 
@@ -19,18 +13,19 @@ static UIImageView *imageView;
 {
 
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onAppDidBecomeActive:)
-                                                 name:UIApplicationDidBecomeActiveNotification object:nil];
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onPageDidLoad)
-                                                 name:CDVPageDidLoadNotification object:nil];
+        name:UIApplicationDidBecomeActiveNotification object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+        selector:@selector(onPageDidLoad)
+        name:CDVPageDidLoadNotification object:nil];
 
     NSString* onBackgroundKey = @"privacyonbackground";
 
     if([self.commandDelegate.settings objectForKey:[onBackgroundKey lowercaseString]] && [[self.commandDelegate.settings objectForKey:[onBackgroundKey lowercaseString]] isEqualToString:@"true"])
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onAppWillResignActive:)
-                                                     name:UIApplicationDidEnterBackgroundNotification object:nil];
+            name:UIApplicationDidEnterBackgroundNotification object:nil];
     else
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onAppWillResignActive:)
-                                                     name:UIApplicationWillResignActiveNotification object:nil];
+            name:UIApplicationWillResignActiveNotification object:nil];
 }
 
 #pragma mark - Explicit Commands
@@ -67,282 +62,43 @@ static UIImageView *imageView;
 #pragma mark - Helper functions
 -(void) removePrivacyScreen
 {
-    if (imageView)
-    {
-        self.viewController.view.window.hidden = NO;
-
-        [UIView animateWithDuration:0.1f
-                         animations:^{
-                             imageView.alpha = 0.0f;
-                         }
-                         completion:^(BOOL finished) {
-                             [imageView removeFromSuperview];
-                         }];
-    }
+    // This should be omitted if your application presented a lock screen
+    // in -applicationDidEnterBackground:
+    [self.viewController dismissViewControllerAnimated:NO completion:nil];
 }
 
 -(void) applyPrivacyScreen
 {
-    UIImage* splash;
+    // Your application can present a full screen modal view controller to
+    // cover its contents when it moves into the background. If your
+    // application requires a password unlock when it retuns to the
+    // foreground, present your lock screen or authentication view controller here.
+    if (blankViewController == NULL) {
+        blankViewController = [UIViewController new];
+//        blankViewController.view.backgroundColor = [UIColor whiteColor];
 
-    // splash = [UIImage imageNamed:@"LaunchStoryboard"];
+        CAGradientLayer *gradient = [CAGradientLayer layer];
 
-    NSString* imageName = [self getImageName:[self getCurrentOrientation] delegate:(id<CDVScreenOrientationDelegate>)self.viewController device:[self getCurrentDevice]];
-    splash = [UIImage imageNamed:imageName];
+        gradient.frame = blankViewController.view.bounds;
+        // somewhat in line with css: linear-gradient(102deg, #44adfc 0%, #05d5ab 100%)
+        gradient.colors = @[(id)[self colorFromHexString:@"#44adfc"].CGColor, (id)[self colorFromHexString:@"#05d5ab"].CGColor];
 
-    if (splash == NULL)
-    {
-        self.viewController.view.window.hidden = YES;
+        [blankViewController.view.layer insertSublayer:gradient atIndex:0];
     }
-    else
-    {
-        [imageView removeFromSuperview];
-        imageView = nil;
 
-        imageView = [[UIImageView alloc]initWithFrame:[self.viewController.view bounds]];
-        [imageView setImage:splash];
-
-      #ifdef __CORDOVA_4_0_0
-        [[UIApplication sharedApplication].keyWindow addSubview:imageView];
-      #else
-        [self.viewController.view addSubview:imageView];
-      #endif
-
-    }
+    // Pass NO for the animated parameter. Any animation will not complete
+    // before the snapshot is taken.
+    blankViewController.view.window.hidden = NO;
+    [self.viewController.view.window.rootViewController presentViewController:blankViewController animated:NO completion:NULL];
 }
 
-// Code below borrowed from the CDV splashscreen plugin @ https://github.com/apache/cordova-plugin-splashscreen
-// Made some adjustments though, becuase landscape splashscreens are not available for iphone < 6 plus
-- (CDV_iOSDevice) getCurrentDevice
-{
-    CDV_iOSDevice device;
-
-    UIScreen* mainScreen = [UIScreen mainScreen];
-    CGFloat mainScreenHeight = mainScreen.bounds.size.height;
-    CGFloat mainScreenWidth = mainScreen.bounds.size.width;
-
-    int limit = MAX(mainScreenHeight,mainScreenWidth);
-
-    device.iPad = (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad);
-    device.iPhone = (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPhone);
-    device.retina = ([mainScreen scale] == 2.0);
-    device.iPhone4 = (device.iPhone && limit == 480.0);
-    device.iPhone5 = (device.iPhone && limit == 568.0);
-    // note these below is not a true device detect, for example if you are on an
-    // iPhone 6/6+ but the app is scaled it will prob set iPhone5 as true, but
-    // this is appropriate for detecting the runtime screen environment
-    device.iPhone6 = (device.iPhone && limit == 667.0);
-    device.iPhone6Plus = (device.iPhone && limit == 736.0);
-    device.iPhoneX  = (device.iPhone && limit == 812.0);
-
-    return device;
-}
-
-- (BOOL) isUsingCDVLaunchScreen {
-    NSString* launchStoryboardName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"UILaunchStoryboardName"];
-    if (launchStoryboardName) {
-        return ([launchStoryboardName isEqualToString:@"CDVLaunchScreen"]);
-    } else {
-        return NO;
-    }
-}
-
-- (UIInterfaceOrientation)getCurrentOrientation
-{
-    UIInterfaceOrientation iOrientation = [UIApplication sharedApplication].statusBarOrientation;
-    UIDeviceOrientation dOrientation = [UIDevice currentDevice].orientation;
-
-    bool landscape;
-
-    if (dOrientation == UIDeviceOrientationUnknown || dOrientation == UIDeviceOrientationFaceUp || dOrientation == UIDeviceOrientationFaceDown) {
-        // If the device is laying down, use the UIInterfaceOrientation based on the status bar.
-        landscape = UIInterfaceOrientationIsLandscape(iOrientation);
-    } else {
-        // If the device is not laying down, use UIDeviceOrientation.
-        landscape = UIDeviceOrientationIsLandscape(dOrientation);
-
-        // There's a bug in iOS!!!! http://openradar.appspot.com/7216046
-        // So values needs to be reversed for landscape!
-        if (dOrientation == UIDeviceOrientationLandscapeLeft)
-        {
-            iOrientation = UIInterfaceOrientationLandscapeRight;
-        }
-        else if (dOrientation == UIDeviceOrientationLandscapeRight)
-        {
-            iOrientation = UIInterfaceOrientationLandscapeLeft;
-        }
-        else if (dOrientation == UIDeviceOrientationPortrait)
-        {
-            iOrientation = UIInterfaceOrientationPortrait;
-        }
-        else if (dOrientation == UIDeviceOrientationPortraitUpsideDown)
-        {
-            iOrientation = UIInterfaceOrientationPortraitUpsideDown;
-        }
-    }
-
-    return iOrientation;
-}
-
-- (NSString*)getImageName:(UIInterfaceOrientation)currentOrientation delegate:(id<CDVScreenOrientationDelegate>)orientationDelegate device:(CDV_iOSDevice)device
-{
-    // Use UILaunchImageFile if specified in plist.  Otherwise, use Default.
-    NSString* imageName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"UILaunchImageFile"];
-
-    // detect if we are using CB-9762 Launch Storyboard; if so, return the associated image instead
-    if ([self isUsingCDVLaunchScreen]) {
-        imageName = @"LaunchStoryboard";
-        return imageName;
-    }
-
-    NSUInteger supportedOrientations = [orientationDelegate supportedInterfaceOrientations];
-
-    // Checks to see if the developer has locked the orientation to use only one of Portrait or Landscape
-    BOOL supportsLandscape = (supportedOrientations & UIInterfaceOrientationMaskLandscape);
-    BOOL supportsPortrait = (supportedOrientations & UIInterfaceOrientationMaskPortrait || supportedOrientations & UIInterfaceOrientationMaskPortraitUpsideDown);
-    // this means there are no mixed orientations in there
-    BOOL isOrientationLocked = !(supportsPortrait && supportsLandscape);
-
-    if (imageName)
-    {
-        imageName = [imageName stringByDeletingPathExtension];
-    }
-    else
-    {
-        imageName = @"Default";
-    }
-
-    // Add Asset Catalog specific prefixes
-    if ([imageName isEqualToString:@"LaunchImage"])
-    {
-        if (device.iPhone4 || device.iPhone5 || device.iPad) {
-            imageName = [imageName stringByAppendingString:@"-700"];
-        } else if(device.iPhone6) {
-            imageName = [imageName stringByAppendingString:@"-800"];
-        } else if(device.iPhone6Plus || device.iPhoneX ) {
-            if(device.iPhone6Plus) {
-                imageName = [imageName stringByAppendingString:@"-800"];
-            } else {
-                imageName = [imageName stringByAppendingString:@"-1100"];
-            }
-            if (currentOrientation == UIInterfaceOrientationPortrait || currentOrientation == UIInterfaceOrientationPortraitUpsideDown)
-            {
-                imageName = [imageName stringByAppendingString:@"-Portrait"];
-            }
-        }
-    }
-
-    if (device.iPhone5)
-    { // does not support landscape
-        imageName = [imageName stringByAppendingString:@"-568h"];
-    }
-    else if (device.iPhone6)
-    { // does not support landscape
-        imageName = [imageName stringByAppendingString:@"-667h"];
-    }
-    else if (device.iPhone6Plus || device.iPhoneX)
-    { // supports landscape
-        if (isOrientationLocked)
-        {
-            imageName = [imageName stringByAppendingString:(supportsLandscape ? @"-Landscape" : @"")];
-        }
-        else
-        {
-            switch (currentOrientation)
-            {
-                case UIInterfaceOrientationLandscapeLeft:
-                case UIInterfaceOrientationLandscapeRight:
-                    imageName = [imageName stringByAppendingString:@"-Landscape"];
-                    break;
-                default:
-                    break;
-            }
-        }
-        if (device.iPhoneX) {
-            imageName = [imageName stringByAppendingString:@"-2436h"];
-        } else {
-            imageName = [imageName stringByAppendingString:@"-736h"];
-        }
-    }
-    else if (device.iPad)
-    {   // supports landscape
-        if (isOrientationLocked)
-        {
-            imageName = [imageName stringByAppendingString:(supportsLandscape ? @"-Landscape" : @"-Portrait")];
-        }
-        else
-        {
-            switch (currentOrientation)
-            {
-                case UIInterfaceOrientationLandscapeLeft:
-                case UIInterfaceOrientationLandscapeRight:
-                    imageName = [imageName stringByAppendingString:@"-Landscape"];
-                    break;
-
-                case UIInterfaceOrientationPortrait:
-                case UIInterfaceOrientationPortraitUpsideDown:
-                default:
-                    imageName = [imageName stringByAppendingString:@"-Portrait"];
-                    break;
-            }
-        }
-    }
-
-    return imageName;
-}
-
-- (void)updateBounds
-{
-
-    UIImage* img = imageView.image;
-    CGRect imgBounds = (img) ? CGRectMake(0, 0, img.size.width, img.size.height) : CGRectZero;
-
-    CGSize screenSize = [self.viewController.view convertRect:[UIScreen mainScreen].bounds fromView:nil].size;
-    UIInterfaceOrientation orientation = [UIApplication sharedApplication].statusBarOrientation;
-    CGAffineTransform imgTransform = CGAffineTransformIdentity;
-
-    /* If and only if an iPhone application is landscape-only as per
-     * UISupportedInterfaceOrientations, the view controller's orientation is
-     * landscape. In this case the image must be rotated in order to appear
-     * correctly.
-     */
-    CDV_iOSDevice device = [self getCurrentDevice];
-    if (UIInterfaceOrientationIsLandscape(orientation) && !device.iPhone6Plus && !device.iPad)
-    {
-        imgTransform = CGAffineTransformMakeRotation(M_PI / 2);
-        imgBounds.size = CGSizeMake(imgBounds.size.height, imgBounds.size.width);
-    }
-
-    // There's a special case when the image is the size of the screen.
-    if (CGSizeEqualToSize(screenSize, imgBounds.size))
-    {
-        CGRect statusFrame = [self.viewController.view convertRect:[UIApplication sharedApplication].statusBarFrame fromView:nil];
-        if (!(IsAtLeastiOSVersion(@"7.0")))
-        {
-            imgBounds.origin.y -= statusFrame.size.height;
-        }
-    }
-    else if (imgBounds.size.width > 0)
-    {
-        CGRect viewBounds = self.viewController.view.bounds;
-        CGFloat imgAspect = imgBounds.size.width / imgBounds.size.height;
-        CGFloat viewAspect = viewBounds.size.width / viewBounds.size.height;
-        // This matches the behaviour of the native splash screen.
-        CGFloat ratio;
-        if (viewAspect > imgAspect)
-        {
-            ratio = viewBounds.size.width / imgBounds.size.width;
-        }
-        else
-        {
-            ratio = viewBounds.size.height / imgBounds.size.height;
-        }
-        imgBounds.size.height *= ratio;
-        imgBounds.size.width *= ratio;
-    }
-
-    imageView.transform = imgTransform;
-    imageView.frame = imgBounds;
+// Assumes input like "#00FF00" (#RRGGBB).
+- (UIColor *)colorFromHexString:(NSString *)hexString {
+    unsigned rgbValue = 0;
+    NSScanner *scanner = [NSScanner scannerWithString:hexString];
+    [scanner setScanLocation:1]; // bypass '#' character
+    [scanner scanHexInt:&rgbValue];
+    return [UIColor colorWithRed:((rgbValue & 0xFF0000) >> 16)/255.0 green:((rgbValue & 0xFF00) >> 8)/255.0 blue:(rgbValue & 0xFF)/255.0 alpha:1.0];
 }
 
 @end
